@@ -537,9 +537,16 @@ def _build_options(
         tools=[],
         setting_sources=[],
         max_turns=1,
-        **_reasoning_options(reasoning_effort),
+        **_claude_reasoning_options(reasoning_effort),
         **_build_tool_options(sdk, tools),
     )
+
+
+def _claude_reasoning_options(reasoning_effort: str | None) -> dict[str, Any]:
+    """Like ``_reasoning_options``, plus Claude Code's ``max`` effort (not offered by CodeBuddy)."""
+    if (reasoning_effort or "").strip().lower() == "max":
+        return {"thinking": {"type": "adaptive"}, "effort": "max"}
+    return _reasoning_options(reasoning_effort)
 
 
 def _build_tool_options(sdk: ModuleType, tools: list[dict[str, Any]] | None) -> dict[str, Any]:

@@ -499,3 +499,12 @@ async def test_cancel_during_sdk_connect_settles_owner(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await asyncio.wait_for(task, 1)
     assert FakeClient.instances[0].disconnected
+
+
+def test_claude_code_max_effort_keeps_thinking_on() -> None:
+    """Claude Code accepts effort="max"; it must not fall through to thinking disabled."""
+    from deeptutor.services.llm.provider_core.claude_code_provider import _claude_reasoning_options
+
+    assert _claude_reasoning_options("max") == {"thinking": {"type": "adaptive"}, "effort": "max"}
+    assert _claude_reasoning_options("high") == {"thinking": {"type": "adaptive"}, "effort": "high"}
+    assert _claude_reasoning_options(None) == {"thinking": {"type": "disabled"}}
