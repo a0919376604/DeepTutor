@@ -25,6 +25,17 @@ def test_grok_is_treated_as_a_large_context_family() -> None:
     assert window > DEFAULT_CONTEXT_WINDOW_FALLBACK
 
 
+def test_claude_code_aliases_are_treated_as_large_context() -> None:
+    """The claude_code provider stores bare aliases (``sonnet``/``opus``/``haiku``).
+
+    Without a match they fell back to 16k, so the context-window guard snipped
+    every tool result (e.g. ``mastery_status``) before the model could read it.
+    """
+    for alias in ("sonnet", "opus", "haiku"):
+        assert looks_like_large_context_model(alias) is True
+        assert resolve_effective_context_window(model=alias) == LARGE_CONTEXT_MODEL_DEFAULT
+
+
 def test_unknown_model_still_uses_the_small_fallback() -> None:
     assert looks_like_large_context_model("mystery-7b") is False
     assert resolve_effective_context_window(model="mystery-7b") == (DEFAULT_CONTEXT_WINDOW_FALLBACK)

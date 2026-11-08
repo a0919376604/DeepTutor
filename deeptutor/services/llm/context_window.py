@@ -25,6 +25,11 @@ KNOWN_LARGE_CONTEXT_MARKERS = (
     # model entry falls back to 16_384 and the agentic loop snips every tool
     # result (see context_window_guard in agents/loop/pipeline.py).
     "grok",
+    # claude_code provider stores bare Claude Code aliases (provider_registry
+    # strip_model_prefix): "sonnet" / "opus" / "haiku" carry no "claude" marker.
+    "sonnet",
+    "opus",
+    "haiku",
 )
 
 
