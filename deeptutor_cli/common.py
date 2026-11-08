@@ -840,6 +840,7 @@ def build_turn_request(
     config_json: str | None,
     notebook_refs: list[str],
     history_refs: list[str],
+    llm_selection: dict[str, str] | None = None,
 ) -> TurnRequest:
     config = parse_json_object(config_json)
     config.update(parse_config_items(config_items))
@@ -853,6 +854,55 @@ def build_turn_request(
         config=config,
         notebook_references=parse_notebook_references(notebook_refs),
         history_references=[item.strip() for item in history_refs if item.strip()],
+        llm_selection=llm_selection,
+    )
+
+
+def resolve_llm_selection(
+    model: str | None, catalog: dict[str, Any], effort: str | None = None
+) -> dict[str, str] | None:
+    """Map ``--model`` / ``--effort`` to a catalog ``{profile_id, model_id[, reasoning_effort]}``.
+
+    Matches a model's ``model``, ``name`` or ``id`` case-insensitively, searching
+    the active LLM profile first so a shared alias resolves to the active provider.
+    With only ``effort``, the active model is selected with that effort override.
+    """
+    from deeptutor.services.model_selection.llm import LLMSelection
+
+    model = (model or "").strip()
+    effort = (effort or "").strip()
+    if not model and not effort:
+        return None
+    llm = (catalog.get("services") or {}).get("llm") or {}
+    if model:
+        selection = _find_catalog_model(model, llm)
+    else:
+        selection = {
+            "profile_id": str(llm.get("active_profile_id") or ""),
+            "model_id": str(llm.get("active_model_id") or ""),
+        }
+        if not selection["profile_id"] or not selection["model_id"]:
+            raise ValueError("--effort needs an active LLM model; configure one first.")
+    if effort:
+        selection["reasoning_effort"] = effort
+    # Validates reasoning_effort against the runtime's accepted values.
+    return LLMSelection.from_payload(selection).to_dict()
+
+
+def _find_catalog_model(model: str, llm: dict[str, Any]) -> dict[str, str]:
+    wanted = model.lower()
+    profiles = list(llm.get("profiles") or [])
+    active = llm.get("active_profile_id")
+    profiles.sort(key=lambda profile: profile.get("id") != active)
+    available: list[str] = []
+    for profile in profiles:
+        for entry in profile.get("models") or []:
+            keys = {str(entry.get(k) or "").lower() for k in ("model", "name", "id")}
+            if wanted in keys:
+                return {"profile_id": str(profile["id"]), "model_id": str(entry["id"])}
+            available.append(str(entry.get("model") or entry.get("name") or entry.get("id")))
+    raise ValueError(
+        f"Unknown model {model!r}. Configured models: {', '.join(available) or '(none)'}."
     )
 
 

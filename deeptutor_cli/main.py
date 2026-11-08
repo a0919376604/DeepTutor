@@ -98,11 +98,28 @@ def run_capability(
         None, "--config-json", help="Capability config as JSON."
     ),
     fmt: str = typer.Option("rich", "--format", "-f", help="Output format: rich | json."),
+    model: str | None = typer.Option(
+        None, "--model", "-m", help="Configured LLM model name for this turn; omit for the active model."
+    ),
+    effort: str | None = typer.Option(
+        None, "--effort", help="Reasoning effort override for this turn (e.g. low, medium, high, max)."
+    ),
 ) -> None:
     """Run any capability in a single turn (agent-first entry point)."""
     from deeptutor.app import DeepTutorApp
+    from deeptutor.services.config.model_catalog import get_model_catalog_service
 
-    from .common import run_turn_and_render
+    from .common import resolve_llm_selection, run_turn_and_render
+
+    try:
+        llm_selection = (
+            resolve_llm_selection(model, get_model_catalog_service().load(), effort=effort)
+            if model or effort
+            else None
+        )
+    except ValueError as exc:
+        console.print(str(exc), style="red", markup=False)
+        raise typer.Exit(code=2) from None
 
     request = build_turn_request(
         content=message,
@@ -115,6 +132,7 @@ def run_capability(
         config_json=config_json,
         notebook_refs=notebook_ref,
         history_refs=history_ref,
+        llm_selection=llm_selection,
     )
     client = DeepTutorApp(workspace_id=workspace) if workspace is not None else DeepTutorApp()
     maybe_run(run_turn_and_render(app=client, request=request, fmt=fmt))
